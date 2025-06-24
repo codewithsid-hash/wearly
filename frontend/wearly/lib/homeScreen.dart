@@ -714,6 +714,7 @@
 // }
 
 import 'package:flutter/material.dart';
+import 'package:wearly/mycollection_screen.dart';
 import 'package:wearly/scanner_page.dart';
 import 'package:wearly/season_screen.dart';
 import 'package:wearly/services/view_tags_page.dart';
@@ -1197,23 +1198,12 @@ class _HomeScreenState extends State<HomeScreen>
                 ],
               ),
             ),
-            _buildDrawerItem(Icons.settings, 'My collections', () {}),
+            _buildDrawerItem(Icons.settings, 'My collections', () {
+  Navigator.push(context, MaterialPageRoute(builder: (_) => MyCollectionsPage()));
+}),
             _buildDrawerItem(Icons.favorite, 'Favorites', () {}),
-            _buildDrawerItem(Icons.wb_sunny, 'Seasons', () {
-                Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => SeasonScreen()),
-      );
-}),
-
+            _buildDrawerItem(Icons.calendar_today, 'Seasons', () {}),
             _buildDrawerItem(Icons.calendar_today, 'Weekly Planner', () {}),
-            _buildDrawerItem(Icons.analytics, 'Style Analytics', () {}),
-            _buildDrawerItem(Icons.label_outline, 'View Saved Tags', () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(builder: (context) => ViewTagsPage()),
-  );
-}),
             Divider(color: Colors.white.withOpacity(0.3)),
             _buildDrawerItem(Icons.help_outline, 'Help & Support', () {}),
           ],
