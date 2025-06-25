@@ -12,8 +12,7 @@ import random
 import time
 from pathlib import Path
 from io import BytesIO
-
-from fastapi import FastAPI, UploadFile, Form, HTTPException
+from fastapi import FastAPI, UploadFile, Form, HTTPException,Request
 from fastapi.responses import JSONResponse, FileResponse
 from PIL import Image
 from rembg import remove
@@ -194,6 +193,15 @@ def warm_up_models():
     except Exception as e:
         logging.error(f"An error occurred during model warm-up: {e}")
 
+
+########## base url ##########
+def add_image_url_to_item(item: dict) -> dict:
+    base_url = "http://192.168.10.171:8045"  # Replace with your local IP
+    item["image_url"] = f"{base_url}/wardrobe/{item['filename']}"
+    return item
+
+
+
 app = FastAPI(
     title="Fashion AI Assistant",
     description="API for managing a virtual wardrobe and getting outfit recommendations.",
@@ -290,6 +298,20 @@ def read_root(): return {"status": "Fashion AI Assistant is running."}
 @app.get("/wardrobe/")
 def get_wardrobe(): return [format_item_for_response(item) for item in read_metadata()]
 
+# Total count of items in the wardrobe
+@app.get("/wardrobe/total")
+def get_wardrobe_count():
+    metadata = read_metadata()
+    return {"total_items": len(metadata)}
+
+# Total count of outfits in the wardrobe
+@app.get("/outfits/count")
+def count_selected_outfits():
+    metadata = read_metadata()
+    selected_categories = {"pants", "shirt", "t-shirt"}  # Use set for faster lookup
+    count = sum(1 for item in metadata if item.get("clothing_type", "").lower() in selected_categories)
+    return {"total_outfits": count}
+
 @app.post("/upload-clothing/")
 async def upload_clothing(file: UploadFile, clothing_type: str = Form(...), gender: str = Form(...), occasion: str = Form(...), season: str = Form(...)):
     if clothing_type.lower() not in ALLOWED_CLOTHING_TYPES:
@@ -342,35 +364,62 @@ def update_item_status(item_id: str, status: UpdateStatus):
     write_metadata(metadata)
     return {"message": f"Item {item_id} status updated.", "updated_item": format_item_for_response(item_to_update)}
 
+
 @app.post("/recommend-from-upload/")
-async def recommend_from_upload(file: UploadFile, input_clothing_type: str = Form(...), gender: str = Form(...), occasion: str = Form(...), season: str = Form(...)):
+async def recommend_from_upload(
+    file: UploadFile,
+    input_clothing_type: str = Form(...),
+    gender: str = Form(...),
+    occasion: str = Form(...),
+    season: str = Form(...)
+):
     temp_path = UPLOAD_DIR / f"{uuid.uuid4()}_{file.filename}"
+    base_url = "http://192.168.10.171:8045"  # 🔁 Replace with your machine's local IP
+
     try:
+        # Save uploaded image
         with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        
+
+        # Process image
         original_image = Image.open(temp_path)
         processed_image = safe_remove(original_image)
         vgg_features, color_features = extract_features(processed_image, vgg)
-        
+
+        # Create profile for uploaded item
         input_item_profile = {
-            "clothing_type": input_clothing_type.lower(), "gender": gender.lower(),
-            "occasion": occasion.lower(), "season": season.lower(),
-            "features": vgg_features, "color_features": color_features
+            "clothing_type": input_clothing_type.lower(),
+            "gender": gender.lower(),
+            "occasion": occasion.lower(),
+            "season": season.lower(),
+            "features": vgg_features,
+            "color_features": color_features,
+            "image_url": f"{base_url}/wardrobe/{temp_path.name}"  # 👈 Include image URL
         }
-        
+
         wardrobe = read_metadata()
         recommended_outfit = get_single_outfit_recommendation(input_item_profile, wardrobe)
-        
+
         if not recommended_outfit:
             return JSONResponse(content={"message": "No suitable items found to complete the outfit."})
 
-        return JSONResponse(content={"input_item": format_item_for_response(input_item_profile), "recommended_outfit": recommended_outfit})
+        # Add image_url to each recommended item
+        for item in recommended_outfit:
+            if "filename" in item:
+                item["image_url"] = f"{base_url}/wardrobe/{item['filename']}"
+
+        return JSONResponse(content={
+            "input_item": input_item_profile,
+            "recommended_outfit": recommended_outfit
+        })
+
     except Exception as e:
         logging.exception("Operation failed during outfit recommendation from upload.")
         raise HTTPException(status_code=500, detail="An internal server error occurred.") from e
+
     finally:
-        if temp_path.exists(): temp_path.unlink()
+        if temp_path.exists():
+            temp_path.unlink()
 
 @app.post("/recommend-from-wardrobe/")
 def recommend_from_wardrobe(item_id: str = Form(...)):
@@ -391,8 +440,8 @@ async def recommend_by_weather(city: str, gender: str, occasion: str):
     try:
         async with python_weather.Client(unit=python_weather.METRIC) as client:
             weather = await client.get(city)
-            season = determine_season(weather.current.temperature, weather.current.humidity)
-            logging.info(f"Weather for {city}: {weather.current.temperature}°C, {weather.current.humidity}%. Detected season: '{season}'.")
+            season = determine_season(weather.temperature, weather.humidity)
+            logging.info(f"Weather for {city}: {weather.temperature}°C, {weather.humidity}%. Detected season: '{season}'.")
             
             wardrobe = read_metadata()
             available_mains = [item for item in wardrobe if item['is_washed'] and item['clothing_type'] in ALLOWED_CLOTHING_TYPES and item['gender'] == gender.lower() and item['season'] == season]
