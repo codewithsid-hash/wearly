@@ -817,6 +817,7 @@ import 'dart:math' as math;
 import 'package:wearly/bestcomination_page.dart';
 import 'package:wearly/mycollection_screen.dart';
 import 'package:wearly/season_screen.dart';
+import 'package:wearly/upload_screen.dart';
 import 'package:wearly/weeklyplanner_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -976,24 +977,20 @@ Future<int?> fetchOutfitCount() async {
         CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut));
   }
 
-  void _startAnimations() {
-    _mainController.forward();
-    _floatingController.repeat();
-    _pulseController.repeat(reverse: true);
 
-    // Auto-start outfit animation after a delay
-    Future.delayed(Duration(milliseconds: 2000), () {
-      _showOutfitAnimation();
-    });
-  }
 
+void _startAnimations() {
+  _mainController.forward();
+  _floatingController.repeat();
+  _pulseController.repeat(reverse: true);
+}
   void _showOutfitAnimation() {
-    setState(() {
-      _showOutfit = true;
-    });
-    _outfitController.forward();
-    HapticFeedback.lightImpact();
-  }
+  Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => UploadLookScreen()),
+  );
+}
+
 
   void _nextOutfit() {
     _outfitController.reset();
@@ -1010,6 +1007,16 @@ Future<int?> fetchOutfitCount() async {
     _pulseController.dispose();
     super.dispose();
   }
+
+  Future<void> _handleRefresh() async {
+  setState(() => _isLoading = true);
+  await fetchItemCount();
+  final updatedOutfitCount = await fetchOutfitCount();
+  setState(() {
+    outfitCount = updatedOutfitCount;
+  });
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -1133,9 +1140,11 @@ Future<int?> fetchOutfitCount() async {
   }
 
   Widget _buildMainContent() {
-    return SafeArea(
+  return SafeArea(
+    child: RefreshIndicator(
+      onRefresh: _handleRefresh,
       child: SingleChildScrollView(
-        physics: BouncingScrollPhysics(),
+        physics: AlwaysScrollableScrollPhysics(), // Ensures pull even when not scrollable
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 20),
           child: Column(
@@ -1152,8 +1161,10 @@ Future<int?> fetchOutfitCount() async {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
+
 
   Widget _buildWelcomeSection() {
     return FadeTransition(
