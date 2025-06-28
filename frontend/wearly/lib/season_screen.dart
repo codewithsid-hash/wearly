@@ -108,7 +108,7 @@ class _SeasonScreenState extends State<SeasonScreen>
     });
 
     try {
-      final response = await http.get(Uri.parse('http://192.168.10.171:8045/wardrobe/'));
+      final response = await http.get(Uri.parse('http://192.168.31.75:8045/wardrobe/'));
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
@@ -124,7 +124,7 @@ class _SeasonScreenState extends State<SeasonScreen>
             _currentPages[seasonLower] = 0;
           }
 
-          item['image_url'] = 'http://192.168.10.171:8045/wardrobe/${item['filename']}';
+          item['image_url'] = 'http://192.168.31.75:8045/wardrobe/${item['filename']}';
           grouped[seasonLower]!.add(Map<String, dynamic>.from(item));
         }
 

@@ -1,4 +1,6 @@
 import os
+from fastapi.staticfiles import StaticFiles
+from typing import Optional
 # --- CPU Execution Configuration ---
 # This line MUST be at the top, before importing any ML libraries.
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -13,7 +15,7 @@ import base64
 from pathlib import Path
 from io import BytesIO
 
-from fastapi import FastAPI, UploadFile, Form, HTTPException
+from fastapi import FastAPI, UploadFile, Form, HTTPException,Body
 from fastapi.responses import JSONResponse, FileResponse
 from PIL import Image
 from rembg import remove
@@ -28,13 +30,31 @@ from tensorflow.keras.applications import VGG16
 from tensorflow.keras.applications.vgg16 import preprocess_input
 from sklearn.metrics.pairwise import cosine_similarity
 from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+import base64
+from io import BytesIO
 
-from fastapi.staticfiles import StaticFiles
 
 # --- Basic Setup & Configuration ---
 
+app = FastAPI()
+
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] - %(message)s")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Or set your Flutter IP
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# BASE_DIR = Path(__file__).parent
+# BASE_URL = "http://192.168.31.75:8045"
+# UPLOAD_DIR = BASE_DIR / "temp_uploads"
+BASE_URL = "http://192.168.31.75:8045"
 BASE_DIR = Path(__file__).parent
 UPLOAD_DIR = BASE_DIR / "temp_uploads"
 WARDROBE_DIR = BASE_DIR / "wardrobe"
@@ -42,6 +62,10 @@ METADATA_FILE = BASE_DIR / "wardrobe_metadata.json"
 YOLO_MODEL_PATH = BASE_DIR / "models" / "best.pt" 
 
 
+
+app.mount("/temp_uploads", StaticFiles(directory="temp_uploads"), name="temp_uploads")
+app.mount("/wardrobe", StaticFiles(directory="wardrobe"), name="wardrobe")
+# app.mount("/temp_uploads", StaticFiles(directory="temp_uploads"), name="temp_uploads")
 
 ALLOWED_CLOTHING_TYPES = ['shirt', 'pants', 't-shirt', 'shoe'] # Added 'shoe' for new extractor
 # Define clothing type relationships
@@ -146,6 +170,11 @@ def precise_extract(source_path: Path, model: YOLO):
 
     return items_list
 
+def image_to_base64(img: Image.Image, format="PNG") -> str:
+    buffered = BytesIO()
+    img.save(buffered, format=format)
+    return base64.b64encode(buffered.getvalue()).decode("utf-8")
+
 def read_metadata():
     if not METADATA_FILE.exists(): return []
     try:
@@ -206,9 +235,18 @@ def extract_features(img: Image.Image, model) -> tuple[list, list]:
     
     return compress_features(vgg_features.flatten().tolist()), color_features
     
+# def format_item_for_response(item: dict) -> dict:
+#     if not item: return None
+#     return {k: v for k, v in item.items() if k not in ['features', 'color_features']}
+
 def format_item_for_response(item: dict) -> dict:
     if not item: return None
-    return {k: v for k, v in item.items() if k not in ['features', 'color_features']}
+    result = {k: v for k, v in item.items() if k not in ['features', 'color_features']}
+    # Add image_url if filename exists
+    if "filename" in item:
+        result["image_url"] = f"{BASE_URL}/wardrobe/{item['filename']}"
+    return result
+
     
 def get_next_item_name(clothing_type: str, metadata: list) -> str:
     count = 1
@@ -275,17 +313,15 @@ app = FastAPI(
 )
 
 
-app.mount("/wardrobe", StaticFiles(directory="wardrobe"), name="wardrobe")
-
 @app.on_event("startup")
 def startup_event():
     validate_metadata()
     warm_up_all_models()
 
-@app.on_event("shutdown")
-def cleanup():
-    logging.info("Shutting down...")
-    if UPLOAD_DIR.exists(): shutil.rmtree(UPLOAD_DIR)
+# @app.on_event("shutdown")
+# def cleanup():
+#     logging.info("Shutting down...")
+#     if UPLOAD_DIR.exists(): shutil.rmtree(UPLOAD_DIR)
 
 # Remaining helper functions and endpoints from the original file go here...
 # (Pydantic Models, Core Recommendation Logic, Weather Logic, API Endpoints)
@@ -354,10 +390,24 @@ def determine_season(temp_celsius: float, humidity: float) -> str:
 @app.get("/")
 def read_root(): return {"status": "Fashion AI Assistant is running."}
 
+@app.get("/wardrobe/")
+def get_wardrobe(): return [format_item_for_response(item) for item in read_metadata()]
+
+
+@app.get("/wardobe/count")
+def count_collection_items():
+    metadata = read_metadata()
+    return {"total_items": len(metadata)}
+
 @app.get("/wardrobe/total")
 def get_wardrobe_count():
     metadata = read_metadata()
     return {"total_items": len(metadata)}
+
+# Add this to main.py for debugging
+@app.get("/debug/list-temp-uploads")
+def list_temp_uploads():
+    return [f.name for f in UPLOAD_DIR.iterdir() if f.is_file()]
 
 # Total count of outfits in the wardrobe
 @app.get("/outfits/count")
@@ -366,6 +416,10 @@ def count_selected_outfits():
     selected_categories = {"pants", "shirt", "t-shirt"}  # Use set for faster lookup
     count = sum(1 for item in metadata if item.get("clothing_type", "").lower() in selected_categories)
     return {"total_outfits": count}
+
+@app.get("/tryon")
+def tryon():
+    return RedirectResponse(url="https://huggingface.co/spaces/Kwai-Kolors/Kolors-Virtual-Try-On", status_code=302)
 
 @app.post("/extract/")
 async def extract_items_from_upload(file: UploadFile):
@@ -402,8 +456,7 @@ async def extract_items_from_upload(file: UploadFile):
     finally:
         if temp_path.exists(): temp_path.unlink()
 
-@app.get("/wardrobe/")
-def get_wardrobe(): return [format_item_for_response(item) for item in read_metadata()]
+
 
 @app.post("/upload-clothing/")
 async def upload_clothing(file: UploadFile, clothing_type: str = Form(...), gender: str = Form(...), occasion: str = Form(...), season: str = Form(...)):
@@ -445,6 +498,7 @@ async def upload_clothing(file: UploadFile, clothing_type: str = Form(...), gend
     finally:
         if temp_path.exists(): temp_path.unlink()
 
+
 @app.patch("/wardrobe/item/{item_id}")
 def update_item_status(item_id: str, status: UpdateStatus):
     metadata = read_metadata()
@@ -458,35 +512,206 @@ def update_item_status(item_id: str, status: UpdateStatus):
     write_metadata(metadata)
     return {"message": f"Item {item_id} status updated.", "updated_item": format_item_for_response(item_to_update)}
 
+@app.patch("/wardrobe/{item_id}")
+def update_item_metadata(
+    item_id: str,
+    gender: Optional[str] = Body(default=None),
+    season: Optional[str] = Body(default=None),
+    occasion: Optional[str] = Body(default=None),
+    is_washed: Optional[bool] = Body(default=None),
+    is_favorite: Optional[bool] = Body(default=None),
+):
+    metadata = read_metadata()
+    item = next((i for i in metadata if i["id"] == item_id), None)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    if gender is not None:
+        item["gender"] = gender
+    if season is not None:
+        item["season"] = season
+    if occasion is not None:
+        item["occasion"] = occasion
+    if is_washed is not None:
+        item["is_washed"] = is_washed
+    if is_favorite is not None:
+        item["is_favorite"] = is_favorite
+
+    write_metadata(metadata)
+    return {"status": "updated", "item": format_item_for_response(item)}
+
+
+
+# ...existing code...
+
+
+# ...existing code...
 @app.post("/recommend-from-upload/")
-async def recommend_from_upload(file: UploadFile, input_clothing_type: str = Form(...), gender: str = Form(...), occasion: str = Form(...), season: str = Form(...)):
-    temp_path = UPLOAD_DIR / f"{uuid.uuid4()}_{file.filename}"
+async def recommend_from_upload(
+    file: UploadFile,
+    input_clothing_type: str = Form(...),
+    gender: str = Form(...),
+    occasion: str = Form(...),
+    season: str = Form(...)
+):
+    temp_path = UPLOAD_DIR / file.filename
     try:
         with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        
+
         original_image = Image.open(temp_path)
         processed_image = safe_remove(original_image)
         vgg_features, color_features = extract_features(processed_image, vgg)
-        
+
         input_item_profile = {
-            "clothing_type": input_clothing_type.lower(), "gender": gender.lower(),
-            "occasion": occasion.lower(), "season": season.lower(),
-            "features": vgg_features, "color_features": color_features
+            "clothing_type": input_clothing_type.lower(),
+            "gender": gender.lower(),
+            "occasion": occasion.lower(),
+            "season": season.lower(),
+            "features": vgg_features,
+            "color_features": color_features,
         }
-        
+
         wardrobe = read_metadata()
         recommended_outfit = get_single_outfit_recommendation(input_item_profile, wardrobe)
-        
+
         if not recommended_outfit:
             return JSONResponse(content={"message": "No suitable items found to complete the outfit."})
 
-        return JSONResponse(content={"input_item": format_item_for_response(input_item_profile), "recommended_outfit": recommended_outfit})
+        # Convert images to base64
+        input_base64 = image_to_base64(processed_image)
+        def get_wardrobe_base64(item):
+            filename = item.get("filename", "")
+            if filename:
+                wardrobe_img_path = WARDROBE_DIR / filename
+                if wardrobe_img_path.exists():
+                    img = Image.open(wardrobe_img_path)
+                    return image_to_base64(img)
+            return ""
+
+        return JSONResponse(content={
+            "input_item": {
+                "clothing_type": input_clothing_type,
+                "gender": gender,
+                "occasion": occasion,
+                "season": season,
+                "image_base64": input_base64
+            },
+            "recommended_outfit": [
+                {
+                    "clothing_type": item.get("clothing_type", ""),
+                    "gender": item.get("gender", ""),
+                    "occasion": item.get("occasion", ""),
+                    "season": item.get("season", ""),
+                    "image_base64": get_wardrobe_base64(item)
+                }
+                for item in recommended_outfit
+            ]
+        })
+
     except Exception as e:
         logging.exception("Operation failed during outfit recommendation from upload.")
         raise HTTPException(status_code=500, detail="An internal server error occurred.") from e
     finally:
-        if temp_path.exists(): temp_path.unlink()
+        if temp_path.exists():
+            temp_path.unlink()
+# ...existing code...
+# ...existing code...
+
+# @app.post("/recommend-from-upload/")
+# async def recommend_from_upload(
+#     file: UploadFile,
+#     input_clothing_type: str = Form(...),
+#     gender: str = Form(...),
+#     occasion: str = Form(...),
+#     season: str = Form(...)
+# ):
+#     temp_path = UPLOAD_DIR / f"{uuid.uuid4()}_{file.filename}"
+#     try:
+#         with open(temp_path, "wb") as buffer:
+#             shutil.copyfileobj(file.file, buffer)
+
+#         original_image = Image.open(temp_path)
+#         processed_image = safe_remove(original_image)
+#         vgg_features, color_features = extract_features(processed_image, vgg)
+
+#         input_item_profile = {
+#             "clothing_type": input_clothing_type.lower(),
+#             "gender": gender.lower(),
+#             "occasion": occasion.lower(),
+#             "season": season.lower(),
+#             "features": vgg_features,
+#             "color_features": color_features,
+#         }
+
+#         wardrobe = read_metadata()
+#         recommended_outfit = get_single_outfit_recommendation(input_item_profile, wardrobe)
+
+#         if not recommended_outfit:
+#             return JSONResponse(content={"message": "No suitable items found to complete the outfit."})
+
+#         # Return both uploaded and recommended images as URLs
+#         def get_wardrobe_image_url(item):
+#             filename = item.get("filename", "")
+#             return f"{BASE_URL}/wardrobe/{filename}" if filename else ""
+
+#         return JSONResponse(content={
+#             "input_item": {
+#                 "clothing_type": input_clothing_type,
+#                 "gender": gender,
+#                 "occasion": occasion,
+#                 "season": season,
+#                 "image_url": f"{BASE_URL}/temp_uploads/{temp_path.name}"
+#             },
+#             "recommended_outfit": [
+#                 {
+#                     "clothing_type": item.get("clothing_type", ""),
+#                     "gender": item.get("gender", ""),
+#                     "occasion": item.get("occasion", ""),
+#                     "season": item.get("season", ""),
+#                     "image_url": get_wardrobe_image_url(item)
+#                 }
+#                 for item in recommended_outfit
+#             ]
+#         })
+
+#     except Exception as e:
+#         logging.exception("Operation failed during outfit recommendation from upload.")
+#         raise HTTPException(status_code=500, detail="An internal server error occurred.") from e
+#     finally:
+#         # Optionally, you can keep the uploaded image for a while or clean up later
+#         pass
+
+
+# @app.post("/recommend-from-upload/")
+# async def recommend_from_upload(file: UploadFile, input_clothing_type: str = Form(...), gender: str = Form(...), occasion: str = Form(...), season: str = Form(...)):
+#     temp_path = UPLOAD_DIR / f"{uuid.uuid4()}_{file.filename}"
+#     try:
+#         with open(temp_path, "wb") as buffer:
+#             shutil.copyfileobj(file.file, buffer)
+        
+#         original_image = Image.open(temp_path)
+#         processed_image = safe_remove(original_image)
+#         vgg_features, color_features = extract_features(processed_image, vgg)
+        
+#         input_item_profile = {
+#             "clothing_type": input_clothing_type.lower(), "gender": gender.lower(),
+#             "occasion": occasion.lower(), "season": season.lower(),
+#             "features": vgg_features, "color_features": color_features
+#         }
+        
+#         wardrobe = read_metadata()
+#         recommended_outfit = get_single_outfit_recommendation(input_item_profile, wardrobe)
+        
+#         if not recommended_outfit:
+#             return JSONResponse(content={"message": "No suitable items found to complete the outfit."})
+
+#         return JSONResponse(content={"input_item": format_item_for_response(input_item_profile), "recommended_outfit": recommended_outfit})
+#     except Exception as e:
+#         logging.exception("Operation failed during outfit recommendation from upload.")
+#         raise HTTPException(status_code=500, detail="An internal server error occurred.") from e
+#     finally:
+#         if temp_path.exists(): temp_path.unlink()
 
 @app.post("/recommend-from-wardrobe/")
 def recommend_from_wardrobe(item_id: str = Form(...)):
@@ -506,8 +731,8 @@ async def recommend_by_weather(city: str, gender: str, occasion: str):
     try:
         async with python_weather.Client(unit=python_weather.METRIC) as client:
             weather = await client.get(city)
-            season = determine_season(weather.current.temperature, weather.current.humidity)
-            logging.info(f"Weather for {city}: {weather.current.temperature}°C, {weather.current.humidity}%. Detected season: '{season}'.")
+            season = determine_season(weather.temperature, weather.humidity)
+            logging.info(f"Weather for {city}: {weather.temperature}°C, {weather.humidity}%. Detected season: '{season}'.")
             
             wardrobe = read_metadata()
             available_mains = [item for item in wardrobe if item['is_washed'] and item['clothing_type'] in ALLOWED_CLOTHING_TYPES and item['gender'] == gender.lower() and item['season'] == season]

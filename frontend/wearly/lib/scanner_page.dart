@@ -28,7 +28,7 @@ class _ScannerPageState extends State<ScannerPage> {
   final List<String> occasions = ['Formal', 'Casual', 'Party'];
   final List<String> seasons = ['Summer', 'Winter', 'Spring', 'Autumn'];
 
-  final String apiUrl = "http://192.168.10.171:8045/recommend-from-upload/";
+  final String apiUrl = "http://192.168.31.75:8045/recommend-from-upload/";
 
   Future<void> _pickImage(ImageSource source) async {
     final pickedFile = await ImagePicker().pickImage(

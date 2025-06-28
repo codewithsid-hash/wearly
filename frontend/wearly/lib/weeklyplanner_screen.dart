@@ -98,7 +98,7 @@ class _WeeklyPlannerPageState extends State<WeeklyPlannerPage>
     HapticFeedback.lightImpact();
 
     try {
-      final uri = Uri.parse('http://192.168.10.171:8045/recommend-by-weather/')
+      final uri = Uri.parse('http://192.168.31.75:8045/recommend-by-weather/')
           .replace(queryParameters: {
         'city': city,
         'gender': gender,
@@ -725,71 +725,135 @@ class _WeeklyPlannerPageState extends State<WeeklyPlannerPage>
     );
   }
 
+  // Widget _buildOutfitItem(dynamic item) {
+  //   return Container(
+  //     margin: EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+  //     padding: EdgeInsets.all(12),
+  //     decoration: BoxDecoration(
+  //       color: Colors.white.withOpacity(0.05),
+  //       borderRadius: BorderRadius.circular(12),
+  //       border: Border.all(color: Colors.white.withOpacity(0.1)),
+  //     ),
+  //     child: Row(
+  //       children: [
+  //         Container(
+  //           width: 60,
+  //           height: 60,
+  //           decoration: BoxDecoration(
+  //             color: Colors.white.withOpacity(0.1),
+  //             borderRadius: BorderRadius.circular(12),
+  //             border: Border.all(color: Colors.white.withOpacity(0.2)),
+  //           ),
+  //           child: item['image_url'] != null
+  //               ? ClipRRect(
+  //                   borderRadius: BorderRadius.circular(12),
+  //                   child: Image.network(
+  //                     item['image_url'],
+  //                     fit: BoxFit.cover,
+  //                     errorBuilder: (context, error, stackTrace) => Icon(
+  //                       Icons.image_not_supported,
+  //                       color: Colors.white.withOpacity(0.5),
+  //                     ),
+  //                   ),
+  //                 )
+  //               : Icon(
+  //                   Icons.checkroom_rounded,
+  //                   color: Colors.white.withOpacity(0.5),
+  //                   size: 30,
+  //                 ),
+  //         ),
+  //         SizedBox(width: 16),
+  //         Expanded(
+  //           child: Column(
+  //             crossAxisAlignment: CrossAxisAlignment.start,
+  //             children: [
+  //               Text(
+  //                 item['clothing_type'] ?? 'Clothing Item',
+  //                 style: TextStyle(
+  //                   color: Colors.white,
+  //                   fontSize: 16,
+  //                   fontWeight: FontWeight.w600,
+  //                 ),
+  //               ),
+  //               SizedBox(height: 4),
+  //               Text(
+  //                 item['name'] ?? 'No description',
+  //                 style: TextStyle(
+  //                   color: Colors.white.withOpacity(0.7),
+  //                   fontSize: 14,
+  //                 ),
+  //               ),
+  //             ],
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
   Widget _buildOutfitItem(dynamic item) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      padding: EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withOpacity(0.2)),
-            ),
-            child: item['image_url'] != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      item['image_url'],
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Icon(
-                        Icons.image_not_supported,
-                        color: Colors.white.withOpacity(0.5),
-                      ),
-                    ),
-                  )
-                : Icon(
-                    Icons.checkroom_rounded,
-                    color: Colors.white.withOpacity(0.5),
-                    size: 30,
-                  ),
+  return Container(
+    margin: EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+    padding: EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(0.05),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: Colors.white.withOpacity(0.1)),
+    ),
+    child: Row(
+      children: [
+        Container(
+          width: 60,
+          height: 60,
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.white.withOpacity(0.2)),
+            borderRadius: BorderRadius.circular(12),
           ),
-          SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item['clothing_type'] ?? 'Clothing Item',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+          child: item['image_url'] != null && item['image_url'].toString().isNotEmpty
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    item['image_url'],
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Icon(
+                      Icons.image_not_supported,
+                      color: Colors.white.withOpacity(0.5),
+                    ),
                   ),
+                )
+              : Icon(
+                  Icons.checkroom_rounded,
+                  color: Colors.white.withOpacity(0.5),
+                  size: 30,
                 ),
-                SizedBox(height: 4),
+        ),
+        SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item['name'] ?? item['clothing_type'] ?? 'Item',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                ),
+              ),
+              if (item['clothing_type'] != null)
                 Text(
-                  item['name'] ?? 'No description',
+                  item['clothing_type'].toString().toUpperCase(),
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.7),
-                    fontSize: 14,
+                    fontSize: 13,
                   ),
                 ),
-              ],
-            ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildNewPlanButton() {
     return Container(
