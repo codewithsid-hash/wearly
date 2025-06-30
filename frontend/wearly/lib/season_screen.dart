@@ -108,25 +108,35 @@ class _SeasonScreenState extends State<SeasonScreen>
     });
 
     try {
-      final response = await http.get(Uri.parse('http://192.168.31.75:8045/wardrobe/'));
+      final response = await http.get(Uri.parse('http://192.168.10.171:8045/wardrobe/'));
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         final Map<String, List<Map<String, dynamic>>> grouped = {};
 
-        for (var item in data) {
-          final season = item['season'] ?? 'unknown';
-          final seasonLower = season.toString().toLowerCase();
+        // ...existing code...
+for (var item in data) {
+  var season = (item['season'] ?? 'unknown').toString().toLowerCase();
 
-          if (!grouped.containsKey(seasonLower)) {
-            grouped[seasonLower] = [];
-            _pageControllers[seasonLower] = PageController(viewportFraction: 0.8);
-            _currentPages[seasonLower] = 0;
-          }
+  // Normalize season values
+  if (season == 'autumn/spring') {
+    season = 'autumn'; // or 'spring', or split into both if you want
+  } else if (season == 'monsoon') {
+    season = 'summer'; // or 'autumn', or create a new entry in _seasonData if you want
+  } else if (!['spring', 'summer', 'autumn', 'winter'].contains(season)) {
+    season = 'unknown';
+  }
 
-          item['image_url'] = 'http://192.168.31.75:8045/wardrobe/${item['filename']}';
-          grouped[seasonLower]!.add(Map<String, dynamic>.from(item));
-        }
+  if (!grouped.containsKey(season)) {
+    grouped[season] = [];
+    _pageControllers[season] = PageController(viewportFraction: 0.8);
+    _currentPages[season] = 0;
+  }
+
+  item['image_url'] = 'http://192.168.10.171:8045/wardrobe/${item['filename']}';
+  grouped[season]!.add(Map<String, dynamic>.from(item));
+}
+// ...existing code...
 
         setState(() {
           _groupedBySeason = grouped;

@@ -65,7 +65,7 @@ void initState() {
 
 Future<void> fetchItemCount() async {
   try {
-    final response = await http.get(Uri.parse('http://192.168.31.75:8045/wardrobe/total'));
+    final response = await http.get(Uri.parse('http://192.168.10.171:8045/wardrobe/total'));
     print('STATUS: ${response.statusCode}');
     print('BODY: ${response.body}');
 
@@ -86,7 +86,7 @@ Future<void> fetchItemCount() async {
 }
 
 Future<int?> fetchOutfitCount() async {
-  final url = Uri.parse("http://192.168.31.75:8045/outfits/count"); // Replace with your actual IP
+  final url = Uri.parse("http://192.168.10.171:8045/outfits/count"); // Replace with your actual IP
   try {
     final response = await http.get(url);
     if (response.statusCode == 200) {

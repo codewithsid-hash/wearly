@@ -98,7 +98,7 @@ class _WeeklyPlannerPageState extends State<WeeklyPlannerPage>
     HapticFeedback.lightImpact();
 
     try {
-      final uri = Uri.parse('http://192.168.31.75:8045/recommend-by-weather/')
+      final uri = Uri.parse('http://192.168.10.171:8045/recommend-by-weather/')
           .replace(queryParameters: {
         'city': city,
         'gender': gender,

@@ -44,7 +44,7 @@ class _BestCombinationPageState extends State<BestCombinationPage> {
     setState(() => isLoading = true);
 
     try {
-      final uri = Uri.parse('http://192.168.31.75:8045/recommend-from-upload/');
+      final uri = Uri.parse('http://192.168.10.171:8045/recommend-from-upload/');
       final request = http.MultipartRequest('POST', uri)
         ..fields['input_clothing_type'] = clothingType
         ..fields['gender'] = gender

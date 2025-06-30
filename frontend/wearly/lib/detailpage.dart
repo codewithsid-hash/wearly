@@ -323,7 +323,7 @@ class _DressDetailPageState extends State<DressDetailPage>
                 child: Hero(
                   tag: 'item_${currentItem['id']}_$index',
                   child: Image.network(
-                    'http://192.168.31.75:8045/wardrobe/$filename',
+                    'http://192.168.10.171:8045/wardrobe/$filename',
                     fit: BoxFit.cover,
                     loadingBuilder: (context, child, progress) {
                       if (progress == null) return child;
@@ -636,7 +636,7 @@ class _DressDetailPageState extends State<DressDetailPage>
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(20),
                   child: Image.network(
-                    'http://192.168.31.75:8045/wardrobe/${currentItem['filename']}',
+                    'http://192.168.10.171:8045/wardrobe/${currentItem['filename']}',
                     fit: BoxFit.contain,
                     errorBuilder: (context, error, stackTrace) => 
                         Icon(Icons.broken_image_rounded, color: Colors.white, size: 100),

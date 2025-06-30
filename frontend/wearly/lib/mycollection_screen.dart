@@ -1,4 +1,4 @@
-// 'http://192.168.31.75:8045/wardbrobe/'
+// 'http://192.168.10.171:8045/wardbrobe/'
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -16,7 +16,7 @@ class MyCollectionsPage extends StatefulWidget {
 class _MyCollectionsPageState extends State<MyCollectionsPage>
     with TickerProviderStateMixin {
   // ...existing code...
-    final String baseUrl = 'http://192.168.31.75:8045/wardrobe/';
+    final String baseUrl = 'http://192.168.10.171:8045/wardrobe/';
 // ...existing code...
   late Future<Map<String, List<Map<String, dynamic>>>> groupedItems;
   
@@ -112,7 +112,7 @@ class _MyCollectionsPageState extends State<MyCollectionsPage>
 
   Future<Map<String, List<Map<String, dynamic>>>> fetchAndGroupWardrobe() async {
     final response = await http.get(
-      Uri.parse('http://192.168.31.75:8045/wardrobe/'),
+      Uri.parse('http://192.168.10.171:8045/wardrobe/'),
     );
 
     if (response.statusCode != 200) {
@@ -125,7 +125,7 @@ class _MyCollectionsPageState extends State<MyCollectionsPage>
     for (var item in wardrobe) {
       final type = (item['clothing_type'] ?? 'others').toString().toLowerCase();
       grouped.putIfAbsent(type, () => []);
-      item['image_url'] = 'http://192.168.31.75:8045/wardrobe/${item['filename']}';
+      item['image_url'] = 'http://192.168.10.171:8045/wardrobe/${item['filename']}';
       grouped[type]!.add(Map<String, dynamic>.from(item));
     }
 
@@ -473,7 +473,7 @@ class _MyCollectionsPageState extends State<MyCollectionsPage>
                   child: Hero(
                     tag: 'item_${item['id']}_$index',
                     child: Image.network(
-                      'http://192.168.31.75:8045/wardrobe/$filename',
+                      'http://192.168.10.171:8045/wardrobe/$filename',
                       fit: BoxFit.fill,
                       loadingBuilder: (context, child, progress) {
                         if (progress == null) return child;

@@ -52,9 +52,9 @@ app.add_middleware(
 )
 
 # BASE_DIR = Path(__file__).parent
-# BASE_URL = "http://192.168.31.75:8045"
+# BASE_URL = "http://192.168.10.171:8045"
 # UPLOAD_DIR = BASE_DIR / "temp_uploads"
-BASE_URL = "http://192.168.31.75:8045"
+BASE_URL = "http://192.168.10.171:8045"
 BASE_DIR = Path(__file__).parent
 UPLOAD_DIR = BASE_DIR / "temp_uploads"
 WARDROBE_DIR = BASE_DIR / "wardrobe"
@@ -540,10 +540,29 @@ def update_item_metadata(
     write_metadata(metadata)
     return {"status": "updated", "item": format_item_for_response(item)}
 
+@app.delete("/wardrobe/cleanup-missing")
+def cleanup_missing_images():
+    metadata = read_metadata()
+    cleaned = [item for item in metadata if (WARDROBE_DIR / item["filename"]).exists()]
+    removed = len(metadata) - len(cleaned)
+    write_metadata(cleaned)
+    return {"removed_entries": removed, "remaining_items": len(cleaned)}
 
 
-# ...existing code...
-
+@app.delete("/wardrobe/item/{item_id}")
+def delete_wardrobe_item(item_id: str):
+    metadata = read_metadata()
+    item = next((i for i in metadata if i["id"] == item_id), None)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    # Remove image file
+    img_path = WARDROBE_DIR / item["filename"]
+    if img_path.exists():
+        img_path.unlink()
+    # Remove from metadata
+    metadata = [i for i in metadata if i["id"] != item_id]
+    write_metadata(metadata)
+    return {"status": "deleted", "item_id": item_id}
 
 # ...existing code...
 @app.post("/recommend-from-upload/")
