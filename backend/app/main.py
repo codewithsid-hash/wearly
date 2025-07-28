@@ -1,10 +1,80 @@
+# import os
+# from fastapi.staticfiles import StaticFiles
+# from typing import Optional
+# # --- CPU Execution Configuration ---
+# # This line MUST be at the top, before importing any ML libraries.
+# os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
+# import json
+# import uuid
+# import shutil
+# import logging
+# import random
+# import time
+# import base64
+# from pathlib import Path
+# from io import BytesIO
+
+# from fastapi import FastAPI, UploadFile, Form, HTTPException,Body
+# from fastapi.responses import JSONResponse, FileResponse
+# from PIL import Image
+# from rembg import remove
+# import numpy as np
+# import python_weather
+# import asyncio
+# import cv2
+# from ultralytics import YOLO
+
+# from tensorflow.keras.models import Model
+# from tensorflow.keras.applications import VGG16
+# from tensorflow.keras.applications.vgg16 import preprocess_input
+# from sklearn.metrics.pairwise import cosine_similarity
+# from pydantic import BaseModel
+# from fastapi.middleware.cors import CORSMiddleware
+# from fastapi.responses import RedirectResponse
+# import base64
+# from io import BytesIO
+
+
+# # --- Basic Setup & Configuration ---
+
+# app = FastAPI()
+
+
+# logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] - %(message)s")
+
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["*"],  # Or set your Flutter IP
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
+
+# # BASE_DIR = Path(__file__).parent
+# # BASE_URL = "http://192.168.10.171:8045"
+# # UPLOAD_DIR = BASE_DIR / "temp_uploads"
+# BASE_URL = "http://192.168.10.171:8045"
+# BASE_DIR = Path(__file__).parent
+# UPLOAD_DIR = BASE_DIR / "temp_uploads"
+# WARDROBE_DIR = BASE_DIR / "wardrobe"
+# METADATA_FILE = BASE_DIR / "wardrobe_metadata.json"
+# YOLO_MODEL_PATH = BASE_DIR / "models" / "best.pt" 
+
+
+
+# app.mount("/temp_uploads", StaticFiles(directory="temp_uploads"), name="temp_uploads")
+# app.mount("/wardrobe", StaticFiles(directory="wardrobe"), name="wardrobe")
+
 import os
 from fastapi.staticfiles import StaticFiles
 from typing import Optional
+
 # --- CPU Execution Configuration ---
 # This line MUST be at the top, before importing any ML libraries.
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
+# Import other necessary libraries
 import json
 import uuid
 import shutil
@@ -23,7 +93,6 @@ import numpy as np
 import python_weather
 import asyncio
 import cv2
-from ultralytics import YOLO
 
 from tensorflow.keras.models import Model
 from tensorflow.keras.applications import VGG16
@@ -38,34 +107,53 @@ from io import BytesIO
 
 # --- Basic Setup & Configuration ---
 
-app = FastAPI()
-
+# app = FastAPI() # You have app defined here and later again; let's streamline it.
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] - %(message)s")
 
+# Define app here as well to configure middleware
+app = FastAPI(
+    title="Fashion AI Assistant",
+    description="API for managing a virtual wardrobe, getting outfit recommendations, and precise clothing extraction.",
+    version="6.0.0-segmentation"
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Or set your Flutter IP
+    allow_origins=["*"],   # Or set your Flutter IP
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# BASE_DIR = Path(__file__).parent
-# BASE_URL = "http://192.168.10.171:8045"
-# UPLOAD_DIR = BASE_DIR / "temp_uploads"
-BASE_URL = "http://192.168.10.171:8045"
+# --- CORRECTED BASE_URL DEFINITION ---
+# Use os.getenv to get the host URL from environment variables.
+# Render automatically sets RENDER_EXTERNAL_HOSTNAME for web services.
+RENDER_EXTERNAL_HOSTNAME = os.getenv("RENDER_EXTERNAL_HOSTNAME")
+if RENDER_EXTERNAL_HOSTNAME:
+    # Render services are always HTTPS
+    BASE_URL = f"https://{RENDER_EXTERNAL_HOSTNAME}"
+else:
+    # Fallback for local development or other environments
+    BASE_URL = "http://localhost:8045" # Or "http://127.0.0.1:8045" if that's what you use locally
+
+# Your existing Path definitions remain the same
 BASE_DIR = Path(__file__).parent
 UPLOAD_DIR = BASE_DIR / "temp_uploads"
 WARDROBE_DIR = BASE_DIR / "wardrobe"
 METADATA_FILE = BASE_DIR / "wardrobe_metadata.json"
-YOLO_MODEL_PATH = BASE_DIR / "models" / "best.pt" 
+
+# Ensure directories exist (good to keep these)
+UPLOAD_DIR.mkdir(exist_ok=True)
+WARDROBE_DIR.mkdir(exist_ok=True)
+(BASE_DIR / "models").mkdir(exist_ok=True) # Ensure models directory exists
+# Note: You had (BASE_DIR / "model").mkdir(exist_ok=True) - changed to "models" for consistency with YOLO_MODEL_PATH
 
 
-
+# Your StaticFiles mounts remain the same
 app.mount("/temp_uploads", StaticFiles(directory="temp_uploads"), name="temp_uploads")
 app.mount("/wardrobe", StaticFiles(directory="wardrobe"), name="wardrobe")
-# app.mount("/temp_uploads", StaticFiles(directory="temp_uploads"), name="temp_uploads")
+
 
 ALLOWED_CLOTHING_TYPES = ['shirt', 'pants', 't-shirt', 'shoe'] # Added 'shoe' for new extractor
 # Define clothing type relationships
@@ -94,81 +182,11 @@ def load_vgg_model():
         logging.error(f"Fatal Error: Could not load VGG16 model. {e}")
         raise RuntimeError(f"Could not load VGG16 model: {e}") from e
 
-def load_yolo_model(model_path: Path):
-    """Loads the YOLOv8 segmentation model."""
-    if not model_path.exists():
-        logging.error(f"YOLO model not found at {model_path}.")
-        logging.error("Please download a trained YOLOv8 segmentation model and place it as 'model/best.pt'")
-        raise FileNotFoundError(f"YOLO model not found at {model_path}")
-    try:
-        model = YOLO(model_path)
-        logging.info(f"YOLOv8 model loaded successfully from {model_path}.")
-        return model
-    except Exception as e:
-        logging.error(f"Fatal Error: Could not load YOLO model. {e}")
-        raise RuntimeError(f"Could not load YOLO model: {e}") from e
-
 vgg = load_vgg_model()
-yolo_model = load_yolo_model(YOLO_MODEL_PATH)
 
 
 # --- Image Processing & Metadata Helper Functions ---
 
-def precise_extract(source_path: Path, model: YOLO):
-    """
-    Enhanced clothing extraction with:
-    - YOLOv8 segmentation for precise masks
-    - Class-specific processing
-    - Sole preservation for shoes
-    """
-    # Run inference on the source image
-    results = model(source_path)
-    source_img = Image.open(source_path).convert("RGB") # Ensure it's RGB
-    source_array = np.array(source_img)
-    items_list = []
-
-    if not results or not results[0].masks:
-        logging.warning("YOLO model did not detect any items with masks.")
-        return []
-
-    for r in results:
-        for i, cls in enumerate(r.boxes.cls):
-            class_id = int(cls)
-            class_name = r.names[class_id].lower()
-
-            # Skip non-clothing items for wardrobe purposes
-            if class_name in ['sunglass', 'hat', 'bag', 'person']:
-                continue
-
-            # Get segmentation mask, resize to match original image
-            mask = cv2.resize(r.masks.data[i].cpu().numpy(), (source_array.shape[1], source_array.shape[0])).astype(np.uint8)
-
-            # Apply morphological operations to refine the mask
-            kernel = np.ones((3,3), np.uint8)
-            mask = cv2.dilate(mask, kernel, iterations=1)
-            mask = cv2.erode(mask, kernel, iterations=1)
-
-            # Special handling for shoes to preserve soles
-            if class_name == 'shoe':
-                hsv = cv2.cvtColor(source_array, cv2.COLOR_RGB2HSV)
-                # Define a broad range for white/light grey soles
-                lower_white = np.array([0,0,180])
-                upper_white = np.array([180,40,255])
-                sole_mask = cv2.inRange(hsv, lower_white, upper_white)
-                # Combine the YOLO mask with the color-based sole mask
-                mask = cv2.bitwise_or(mask, sole_mask)
-
-            # Create an RGBA image with a transparent background
-            result_rgba = np.zeros((source_array.shape[0], source_array.shape[1], 4), dtype=np.uint8)
-            result_rgba[:, :, :3] = source_array
-            result_rgba[:, :, 3] = mask * 255 # Apply mask to alpha channel
-
-            items_list.append({
-                "class": class_name,
-                "image": Image.fromarray(result_rgba)
-            })
-
-    return items_list
 
 def image_to_base64(img: Image.Image, format="PNG") -> str:
     buffered = BytesIO()

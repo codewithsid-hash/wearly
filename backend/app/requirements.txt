@@ -7,4 +7,3 @@ numpy
 scikit-learn
 python-weather
 onnxruntime
-ultralytics
