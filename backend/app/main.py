@@ -84,6 +84,7 @@ import time
 import base64
 from pathlib import Path
 from io import BytesIO
+import uvicorn
 
 from fastapi import FastAPI, UploadFile, Form, HTTPException,Body
 from fastapi.responses import JSONResponse, FileResponse
@@ -799,3 +800,8 @@ async def get_wardrobe_image(filename: str):
     image_path = WARDROBE_DIR / filename
     if not image_path.is_file(): raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(str(image_path))
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10780))
+    uvicorn.run(app, host="0.0.0.0", port=port)
