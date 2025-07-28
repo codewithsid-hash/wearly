@@ -314,16 +314,6 @@ def warm_up_all_models():
     except Exception as e:
         logging.error(f"An error occurred during VGG16 warm-up: {e}")
 
-    logging.info("Warming up YOLOv8 model...")
-    try:
-        # Create a dummy image file for YOLO warmup
-        dummy_path = UPLOAD_DIR / "warmup.png"
-        Image.new('RGB', (640, 640), color='green').save(dummy_path)
-        precise_extract(dummy_path, yolo_model)
-        dummy_path.unlink() # Clean up the dummy file
-        logging.info("YOLOv8 model is warmed up and ready.")
-    except Exception as e:
-        logging.error(f"An error occurred during YOLO model warm-up: {e}")
 
 app = FastAPI(
     title="Fashion AI Assistant",
@@ -801,7 +791,8 @@ async def get_wardrobe_image(filename: str):
     if not image_path.is_file(): raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(str(image_path))
 
-
+print("Starting Fashion AI Assistant...")
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10780))
+    print(f"Starting Fashion AI Assistant on port")
     uvicorn.run(app, host="0.0.0.0", port=port)
