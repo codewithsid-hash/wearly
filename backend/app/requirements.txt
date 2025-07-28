@@ -1,8 +1,9 @@
 fastapi
 uvicorn
-# tensorflow-cpu
+tensorflow-cpu
 pillow
 rembg
 numpy 
 scikit-learn
 python-weather
+onnxruntime
