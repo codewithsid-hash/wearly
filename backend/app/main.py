@@ -54,7 +54,9 @@ app.add_middleware(
 # BASE_DIR = Path(__file__).parent
 # BASE_URL = "http://192.168.10.171:8045"
 # UPLOAD_DIR = BASE_DIR / "temp_uploads"
-BASE_URL = "http://192.168.10.171:8045"
+RENDER_EXTERNAL_HOSTNAME = os.getenv("RENDER_EXTERNAL_HOSTNAME")
+BASE_URL = f"https://{RENDER_EXTERNAL_HOSTNAME}" if RENDER_EXTERNAL_HOSTNAME else "http://localhost:8045"
+
 BASE_DIR = Path(__file__).parent
 UPLOAD_DIR = BASE_DIR / "temp_uploads"
 WARDROBE_DIR = BASE_DIR / "wardrobe"
@@ -754,4 +756,5 @@ async def get_wardrobe_image(filename: str):
     return FileResponse(str(image_path))
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8045, log_level="info")
+    port = int(os.environ.get("PORT", 10000))  
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
