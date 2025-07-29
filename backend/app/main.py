@@ -1,10 +1,80 @@
+import os
+from fastapi.staticfiles import StaticFiles
+from typing import Optional
+# --- CPU Execution Configuration ---
+# This line MUST be at the top, before importing any ML libraries.
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
+import json
+import uuid
+import shutil
+import logging
+import random
+import time
+import base64
+from pathlib import Path
+from io import BytesIO
+
+from fastapi import FastAPI, UploadFile, Form, HTTPException,Body
+from fastapi.responses import JSONResponse, FileResponse
+from PIL import Image
+from rembg import remove
+import numpy as np
+import python_weather
+import asyncio
+import cv2
+from ultralytics import YOLO
+
+from keras.models import Model
+from keras.applications import VGG16
+from keras.applications.vgg16 import preprocess_input
+from sklearn.metrics.pairwise import cosine_similarity
+from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+import base64
+from io import BytesIO
+import uvicorn
+
+# --- Basic Setup & Configuration ---
+
+app = FastAPI()
+
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] - %(message)s")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Or set your Flutter IP
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# BASE_DIR = Path(__file__).parent
+# BASE_URL = "http://192.168.10.171:8045"
+# UPLOAD_DIR = BASE_DIR / "temp_uploads"
+BASE_URL = "http://192.168.10.171:8045"
+BASE_DIR = Path(__file__).parent
+UPLOAD_DIR = BASE_DIR / "temp_uploads"
+WARDROBE_DIR = BASE_DIR / "wardrobe"
+METADATA_FILE = BASE_DIR / "wardrobe_metadata.json"
+YOLO_MODEL_PATH = BASE_DIR / "models" / "best.pt" 
+
+
+
+app.mount("/temp_uploads", StaticFiles(directory="temp_uploads"), name="temp_uploads")
+app.mount("/wardrobe", StaticFiles(directory="wardrobe"), name="wardrobe")
+
 # import os
 # from fastapi.staticfiles import StaticFiles
 # from typing import Optional
+
 # # --- CPU Execution Configuration ---
 # # This line MUST be at the top, before importing any ML libraries.
 # os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
+# # Import other necessary libraries
 # import json
 # import uuid
 # import shutil
@@ -14,6 +84,7 @@
 # import base64
 # from pathlib import Path
 # from io import BytesIO
+# import uvicorn
 
 # from fastapi import FastAPI, UploadFile, Form, HTTPException,Body
 # from fastapi.responses import JSONResponse, FileResponse
@@ -23,7 +94,6 @@
 # import python_weather
 # import asyncio
 # import cv2
-# from ultralytics import YOLO
 
 # from tensorflow.keras.models import Model
 # from tensorflow.keras.applications import VGG16
@@ -38,122 +108,52 @@
 
 # # --- Basic Setup & Configuration ---
 
-# app = FastAPI()
-
+# # app = FastAPI() # You have app defined here and later again; let's streamline it.
 
 # logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] - %(message)s")
 
+# # Define app here as well to configure middleware
+# app = FastAPI(
+#     title="Fashion AI Assistant",
+#     description="API for managing a virtual wardrobe, getting outfit recommendations, and precise clothing extraction.",
+#     version="6.0.0-segmentation"
+# )
+
 # app.add_middleware(
 #     CORSMiddleware,
-#     allow_origins=["*"],  # Or set your Flutter IP
+#     allow_origins=["*"],   # Or set your Flutter IP
 #     allow_credentials=True,
 #     allow_methods=["*"],
 #     allow_headers=["*"],
 # )
 
-# # BASE_DIR = Path(__file__).parent
-# # BASE_URL = "http://192.168.10.171:8045"
-# # UPLOAD_DIR = BASE_DIR / "temp_uploads"
-# BASE_URL = "http://192.168.10.171:8045"
+# # --- CORRECTED BASE_URL DEFINITION ---
+# # Use os.getenv to get the host URL from environment variables.
+# # Render automatically sets RENDER_EXTERNAL_HOSTNAME for web services.
+# RENDER_EXTERNAL_HOSTNAME = os.getenv("RENDER_EXTERNAL_HOSTNAME")
+# if RENDER_EXTERNAL_HOSTNAME:
+#     # Render services are always HTTPS
+#     BASE_URL = f"https://{RENDER_EXTERNAL_HOSTNAME}"
+# else:
+#     # Fallback for local development or other environments
+#     BASE_URL = "http://localhost:8045" # Or "http://127.0.0.1:8045" if that's what you use locally
+
+# # Your existing Path definitions remain the same
 # BASE_DIR = Path(__file__).parent
 # UPLOAD_DIR = BASE_DIR / "temp_uploads"
 # WARDROBE_DIR = BASE_DIR / "wardrobe"
 # METADATA_FILE = BASE_DIR / "wardrobe_metadata.json"
-# YOLO_MODEL_PATH = BASE_DIR / "models" / "best.pt" 
+
+# # Ensure directories exist (good to keep these)
+# UPLOAD_DIR.mkdir(exist_ok=True)
+# WARDROBE_DIR.mkdir(exist_ok=True)
+# (BASE_DIR / "models").mkdir(exist_ok=True) # Ensure models directory exists
+# # Note: You had (BASE_DIR / "model").mkdir(exist_ok=True) - changed to "models" for consistency with YOLO_MODEL_PATH
 
 
-
+# # Your StaticFiles mounts remain the same
 # app.mount("/temp_uploads", StaticFiles(directory="temp_uploads"), name="temp_uploads")
 # app.mount("/wardrobe", StaticFiles(directory="wardrobe"), name="wardrobe")
-
-import os
-from fastapi.staticfiles import StaticFiles
-from typing import Optional
-
-# --- CPU Execution Configuration ---
-# This line MUST be at the top, before importing any ML libraries.
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-
-# Import other necessary libraries
-import json
-import uuid
-import shutil
-import logging
-import random
-import time
-import base64
-from pathlib import Path
-from io import BytesIO
-import uvicorn
-
-from fastapi import FastAPI, UploadFile, Form, HTTPException,Body
-from fastapi.responses import JSONResponse, FileResponse
-from PIL import Image
-from rembg import remove
-import numpy as np
-import python_weather
-import asyncio
-import cv2
-
-from tensorflow.keras.models import Model
-from tensorflow.keras.applications import VGG16
-from tensorflow.keras.applications.vgg16 import preprocess_input
-from sklearn.metrics.pairwise import cosine_similarity
-from pydantic import BaseModel
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
-import base64
-from io import BytesIO
-
-
-# --- Basic Setup & Configuration ---
-
-# app = FastAPI() # You have app defined here and later again; let's streamline it.
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] - %(message)s")
-
-# Define app here as well to configure middleware
-app = FastAPI(
-    title="Fashion AI Assistant",
-    description="API for managing a virtual wardrobe, getting outfit recommendations, and precise clothing extraction.",
-    version="6.0.0-segmentation"
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],   # Or set your Flutter IP
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# --- CORRECTED BASE_URL DEFINITION ---
-# Use os.getenv to get the host URL from environment variables.
-# Render automatically sets RENDER_EXTERNAL_HOSTNAME for web services.
-RENDER_EXTERNAL_HOSTNAME = os.getenv("RENDER_EXTERNAL_HOSTNAME")
-if RENDER_EXTERNAL_HOSTNAME:
-    # Render services are always HTTPS
-    BASE_URL = f"https://{RENDER_EXTERNAL_HOSTNAME}"
-else:
-    # Fallback for local development or other environments
-    BASE_URL = "http://localhost:8045" # Or "http://127.0.0.1:8045" if that's what you use locally
-
-# Your existing Path definitions remain the same
-BASE_DIR = Path(__file__).parent
-UPLOAD_DIR = BASE_DIR / "temp_uploads"
-WARDROBE_DIR = BASE_DIR / "wardrobe"
-METADATA_FILE = BASE_DIR / "wardrobe_metadata.json"
-
-# Ensure directories exist (good to keep these)
-UPLOAD_DIR.mkdir(exist_ok=True)
-WARDROBE_DIR.mkdir(exist_ok=True)
-(BASE_DIR / "models").mkdir(exist_ok=True) # Ensure models directory exists
-# Note: You had (BASE_DIR / "model").mkdir(exist_ok=True) - changed to "models" for consistency with YOLO_MODEL_PATH
-
-
-# Your StaticFiles mounts remain the same
-app.mount("/temp_uploads", StaticFiles(directory="temp_uploads"), name="temp_uploads")
-app.mount("/wardrobe", StaticFiles(directory="wardrobe"), name="wardrobe")
 
 
 ALLOWED_CLOTHING_TYPES = ['shirt', 'pants', 't-shirt', 'shoe'] # Added 'shoe' for new extractor
@@ -185,9 +185,7 @@ def load_vgg_model():
 
 vgg = load_vgg_model()
 
-
 # --- Image Processing & Metadata Helper Functions ---
-
 
 def image_to_base64(img: Image.Image, format="PNG") -> str:
     buffered = BytesIO()
@@ -429,42 +427,6 @@ def count_selected_outfits():
 @app.get("/tryon")
 def tryon():
     return RedirectResponse(url="https://huggingface.co/spaces/Kwai-Kolors/Kolors-Virtual-Try-On", status_code=302)
-
-@app.post("/extract/")
-async def extract_items_from_upload(file: UploadFile):
-    """
-    Upload an image and get a list of precisely extracted clothing items.
-    Returns a list of items with their class and Base64-encoded transparent image.
-    """
-    temp_path = UPLOAD_DIR / f"{uuid.uuid4()}_{file.filename}"
-    try:
-        with temp_path.open("wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        
-        # Use the enhanced YOLOv8 extraction
-        extracted_items = precise_extract(temp_path, yolo_model)
-        
-        if not extracted_items:
-            raise HTTPException(status_code=404, detail="No clothing items could be detected in the image.")
-            
-        response_list = []
-        for item in extracted_items:
-            buffered = BytesIO()
-            item["image"].save(buffered, format="PNG")
-            img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
-            response_list.append({
-                "class_name": item["class"],
-                "image_base64": img_str
-            })
-            
-        return JSONResponse(content={"message": "Extraction successful", "items": response_list})
-        
-    except Exception as e:
-        logging.exception("Operation failed during extraction.")
-        raise HTTPException(status_code=500, detail=f"An internal server error occurred: {e}") from e
-    finally:
-        if temp_path.exists(): temp_path.unlink()
-
 
 
 @app.post("/upload-clothing/")
@@ -791,3 +753,5 @@ async def get_wardrobe_image(filename: str):
     if not image_path.is_file(): raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(str(image_path))
 
+if __name__ == "__main__":
+    uvicorn.run(app, host="127.0.0.1", port=8045, log_level="info")
