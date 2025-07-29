@@ -791,8 +791,3 @@ async def get_wardrobe_image(filename: str):
     if not image_path.is_file(): raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(str(image_path))
 
-print("Starting Fashion AI Assistant...")
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10780))
-    print(f"Starting Fashion AI Assistant on port")
-    uvicorn.run(app, host="0.0.0.0", port=port)
