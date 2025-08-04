@@ -20,7 +20,7 @@ class _TagClothingPageState extends State<TagClothingPage> {
   bool _isFavorite = false;
   String? _category;
 
-  final String tagApiUrl = 'http://192.168.10.171:8000/tag/'; // Change IP if needed
+  final String tagApiUrl = 'https://wearlyfinal-102927385476.asia-south1.run.app/tag/'; // Change IP if needed
 
   Future<void> _submitTag() async {
   final itemData = {

@@ -108,7 +108,7 @@ class _SeasonScreenState extends State<SeasonScreen>
     });
 
     try {
-      final response = await http.get(Uri.parse('http://192.168.10.171:8045/wardrobe/'));
+      final response = await http.get(Uri.parse('https://wearlyfinal-102927385476.asia-south1.run.app/wardrobe/'));
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
@@ -133,7 +133,7 @@ for (var item in data) {
     _currentPages[season] = 0;
   }
 
-  item['image_url'] = 'http://192.168.10.171:8045/wardrobe/${item['filename']}';
+  item['image_url'] = 'https://wearlyfinal-102927385476.asia-south1.run.app/wardrobe/${item['filename']}';
   grouped[season]!.add(Map<String, dynamic>.from(item));
 }
 // ...existing code...

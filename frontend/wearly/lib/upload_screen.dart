@@ -16,7 +16,7 @@ class _UploadLookScreenState extends State<UploadLookScreen>
   File? _selectedImage;
   final ImagePicker _picker = ImagePicker();
 
-  static const String API_BASE_URL = 'http://192.168.10.171:8045';
+  static const String API_BASE_URL = 'https://wearlyfinal-102927385476.asia-south1.run.app';
   static const String UPLOAD_ENDPOINT = '/upload-clothing/';
 
   String? _selectedClothingType;
